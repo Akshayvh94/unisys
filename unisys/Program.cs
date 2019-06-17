@@ -24,14 +24,20 @@ namespace unisys
             parameters.UriString = "https://dev.azure.com/" + parameters.Account + "/" + parameters.Project;
             parameters.PatBase = basePat;
             parameters.Pat = pat;
+            List<Tuple<string, string, double>> workItemIteration_cWork = new List<Tuple<string, string, double>>();
             List<WorkItemFetchResponse.WorkItems> workItemsList = GetWorkItemsfromSource("Task", parameters);
             if (workItemsList.Count > 0)
             {
+                List<string> users = new List<string>();
                 foreach (var ItemList in workItemsList)
                 {
                     foreach (var workItem in ItemList.value)
                     {
-
+                        if (!users.Contains(workItem.fields.SystemAssignedTo.displayName))
+                        {
+                            users.Add(workItem.fields.SystemAssignedTo.displayName);
+                        }
+                        workItemIteration_cWork.Add(Tuple.Create(workItem.fields.SystemAssignedTo.displayName, workItem.fields.SystemIterationPath, workItem.fields.MicrosoftVSTSSchedulingCompletedWork));
                         Console.WriteLine("User: " + workItem.fields.SystemAssignedTo.displayName + "\n Complated Work: " + workItem.fields.MicrosoftVSTSSchedulingCompletedWork + "\n Original Estimate " + workItem.fields.MicrosoftVSTSSchedulingOriginalEstimate + Environment.NewLine);
                         Console.WriteLine();
                     }
