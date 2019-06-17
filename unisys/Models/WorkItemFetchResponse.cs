@@ -77,5 +77,12 @@ namespace unisys.Models
             [JsonProperty("descriptor")]
             public string descriptor { get; set; }
         }
+
+        public class WorkItemWithIteration
+        {
+            public string UserName { get; set; }
+            public string IterationPath { get; set; }
+            public double Value { get; set; }
+        }
     }
 }

@@ -1,10 +1,15 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Data;
+using System.Data.OleDb;
+using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Text;
 using unisys.Models;
+using static unisys.Models.WorkItemFetchResponse;
 
 namespace unisys
 {
@@ -24,7 +29,8 @@ namespace unisys
             parameters.UriString = "https://dev.azure.com/" + parameters.Account + "/" + parameters.Project;
             parameters.PatBase = basePat;
             parameters.Pat = pat;
-            List<Tuple<string, string, double>> workItemIteration_cWork = new List<Tuple<string, string, double>>();
+            //List<Tuple<string, string, double>> workItemIteration_cWork = new List<Tuple<string, string, double>>();
+            List<WorkItemWithIteration> workItemIteration_cWork = new List<WorkItemWithIteration>();
             List<WorkItemFetchResponse.WorkItems> workItemsList = GetWorkItemsfromSource("Task", parameters);
             if (workItemsList.Count > 0)
             {
@@ -33,16 +39,30 @@ namespace unisys
                 {
                     foreach (var workItem in ItemList.value)
                     {
-                        if (!users.Contains(workItem.fields.SystemAssignedTo.displayName))
-                        {
-                            users.Add(workItem.fields.SystemAssignedTo.displayName);
-                        }
-                        workItemIteration_cWork.Add(Tuple.Create(workItem.fields.SystemAssignedTo.displayName, workItem.fields.SystemIterationPath, workItem.fields.MicrosoftVSTSSchedulingCompletedWork));
+                        var element = workItemIteration_cWork.Find(e => e.UserName == workItem.fields.SystemAssignedTo.displayName && e.IterationPath == workItem.fields.SystemIterationPath);
+                        if (element != null)
+                            element.Value = element.Value + workItem.fields.MicrosoftVSTSSchedulingCompletedWork;
+                        else
+                            workItemIteration_cWork.Add(new WorkItemWithIteration
+                            {
+                                UserName = workItem.fields.SystemAssignedTo.displayName,
+                                IterationPath = workItem.fields.SystemIterationPath,
+                                Value = workItem.fields.MicrosoftVSTSSchedulingCompletedWork
+                            });
+
                         Console.WriteLine("User: " + workItem.fields.SystemAssignedTo.displayName + "\n Complated Work: " + workItem.fields.MicrosoftVSTSSchedulingCompletedWork + "\n Original Estimate " + workItem.fields.MicrosoftVSTSSchedulingOriginalEstimate + Environment.NewLine);
                         Console.WriteLine();
                     }
                 }
             }
+
+            string Filepath = @"D:\Unisys\Anwar Report.xlsx";            
+            var workIterationFromTimeSheet= ReadDataFromExcel(Filepath);
+
+            DataSet ds = ReadExcel(Filepath, "Sheet1");
+            var workIterationFromDataTable = ReadDataFromDataTable(ds.Tables[0]);
+
+
             Console.ReadLine();
         }
 
@@ -149,6 +169,118 @@ namespace unisys
             return viewModelList;
         }
 
+        // read excel data into datatable
+        public static DataSet ReadExcel(string excelFilePath, string workSheetName)
+        {
+            DataSet dsWorkbook = new DataSet();
+
+            string connectionString = string.Empty;
+
+            switch (Path.GetExtension(excelFilePath).ToUpperInvariant())
+            {
+                case ".XLS":
+                    connectionString = string.Format("Provider=Microsoft.Jet.OLEDB.4.0; Data Source={0}; Extended Properties=Excel 8.0;", excelFilePath);
+                    break;
+
+                case ".XLSX":
+                    connectionString = string.Format("Provider=Microsoft.ACE.OLEDB.12.0;Data Source={0}; Extended Properties=Excel 12.0;", excelFilePath);
+                    break;
+
+            }
+
+            if (!String.IsNullOrEmpty(connectionString))
+            {
+                string selectStatement = string.Format("SELECT * FROM [{0}$]", workSheetName);
+
+                using (OleDbDataAdapter adapter = new OleDbDataAdapter(selectStatement, connectionString))
+                {
+                    adapter.Fill(dsWorkbook, workSheetName);
+                }
+            }
+
+            return dsWorkbook;
+        }
+
+        //Read excel data by looping each record
+        public static List<WorkItemWithIteration> ReadDataFromExcel(string excelFilePath)
+        {
+            List<WorkItemWithIteration> workItemIteration = new List<WorkItemWithIteration>();
+
+            Microsoft.Office.Interop.Excel.Application appExl = new Microsoft.Office.Interop.Excel.Application();
+            Microsoft.Office.Interop.Excel.Workbook workbook = appExl.Workbooks.Open(excelFilePath);
+            Microsoft.Office.Interop.Excel._Worksheet NwSheet = workbook.Sheets[1];
+            Microsoft.Office.Interop.Excel.Range ShtRange = NwSheet.UsedRange;
+
+            int rowCount = ShtRange.Rows.Count;
+            int colCount = ShtRange.Columns.Count;
+
+            int rowindex = 0;
+            DataTable dt = new DataTable();
+            for (int i = 5; i <= rowCount; i++)
+            {
+                if (ShtRange.Cells[i, 1] != null && ShtRange.Cells[i, 1].Value2 != null)
+                {
+                    if (ShtRange.Cells[i, 1].Value2.ToString() == "Row Labels")
+                    {
+                        rowindex = i;
+                    }
+                }
+                if(i>rowindex)
+                {
+                    for (int j = 2; j <= colCount-1; j++)
+                    {
+                        if (ShtRange.Cells[i, j] != null && ShtRange.Cells[i, j].Value2 != null)
+                        {
+                            WorkItemWithIteration wrkitem = new WorkItemWithIteration();
+                            if (ShtRange.Cells[i, 1] != null && ShtRange.Cells[i, 1].Value2 != null)
+                                wrkitem.UserName = ShtRange.Cells[i, 1].Value2.ToString();
+                            if (ShtRange.Cells[rowindex, 1] != null && ShtRange.Cells[rowindex, 1].Value2 != null)
+                                wrkitem.IterationPath = ShtRange.Cells[rowindex, j].Value2.ToString();
+                            if (ShtRange.Cells[i, j] != null && ShtRange.Cells[i, j].Value2 != null)
+                            {
+                                wrkitem.Value = Convert.ToDouble(ShtRange.Cells[i, j].Value2.ToString() == "" ? 0 : ShtRange.Cells[i, j].Value2.ToString());
+                                workItemIteration.Add(wrkitem);
+                            }
+                        }
+                    }
+                }
+                
+                Console.WriteLine();
+            }
+            return workItemIteration;
+        }
+
+        //Read data by looping DataTable record
+        public static List<WorkItemWithIteration> ReadDataFromDataTable(DataTable dt)
+        {
+            List<WorkItemWithIteration> workItemIteration = new List<WorkItemWithIteration>();
+            int rowindex = 0;
+            for(int i=5; i < dt.Rows.Count; i++)
+            {
+                if(dt.Rows[i][1].ToString()== "Row Labels")
+                {
+                    rowindex = i;
+                }
+                if (i > rowindex)
+                {
+                    for (int j = 0; j < dt.Columns.Count-1; j++)
+                    {
+                        WorkItemWithIteration wrkitem = new WorkItemWithIteration();
+                        if (dt.Rows[i][0] != null)
+                            wrkitem.UserName = dt.Rows[i][0].ToString();
+                        if (dt.Rows[rowindex][0] != null)
+                            wrkitem.IterationPath = dt.Rows[rowindex][j].ToString();
+                        if (dt.Rows[i][j] != null)
+                        {
+                            wrkitem.Value = Convert.ToDouble(dt.Rows[i][j].ToString() == "" ? 0 : dt.Rows[i][j]);
+                            workItemIteration.Add(wrkitem);
+                        }
+                    }
+                }
+                
+            }
+            return workItemIteration;
+        }
     }
 }
 
