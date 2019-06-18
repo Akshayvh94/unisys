@@ -72,7 +72,7 @@ namespace unisys
                 } while (string.IsNullOrEmpty(sheetName));
                 //string pat = "rahfqiseaujjsyj5qv7o25yghyicy3cgtrqu3cse267be52lu2na";
                 //string pat = "vmi4rbndghwzyea7camsnkj5jmb6u4za23vyt7xahg2texklfiwa"; // PAT from your ORG
-              
+
 
                 UrlParameters parameters = new UrlParameters();
                 parameters.Project = projectName;// Project name 
@@ -447,7 +447,6 @@ namespace unisys
                     }
 
                 }
-
                 celLrangE = worKsheeT.Range[worKsheeT.Cells[1, 1], worKsheeT.Cells[rowcount, dtWorklist.Columns.Count]];
                 celLrangE.EntireColumn.AutoFit();
                 Microsoft.Office.Interop.Excel.Borders border = celLrangE.Borders;
@@ -455,7 +454,11 @@ namespace unisys
                 border.Weight = 2d;
 
                 celLrangE = worKsheeT.Range[worKsheeT.Cells[1, 1], worKsheeT.Cells[2, dtWorklist.Columns.Count]];
-                string reportPath = @"D:\Unisys\UnisysReport-" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".xlsx";
+                if (!Directory.Exists(path + "\\Reports"))
+                {
+                    Directory.CreateDirectory(path + "\\Reports");
+                }
+                string reportPath = path + "\\Reports\\UnisysReport-" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".xlsx";
                 Console.WriteLine($"Writing result to {reportPath}");
                 worKbooK.SaveAs(reportPath);
                 worKbooK.Close();
