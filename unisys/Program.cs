@@ -6,7 +6,6 @@ using System.Data.OleDb;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Reflection;
 using System.Text;
 using unisys.Models;
 using static unisys.Models.WorkItemFetchResponse;
@@ -17,70 +16,129 @@ namespace unisys
     {
         public static List<string> iterationList = new List<string>();
         public static List<string> UserList = new List<string>();
+        public static string logFile = string.Empty;
+        public static string path = string.Empty;
+        public static string sheetName = string.Empty;
         private static void Main(string[] args)
         {
-            var path = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().GetName().CodeBase);
-            path = path.Replace("file:\\", "");
-            Console.WriteLine(path);
-            Console.WriteLine();
-            Console.WriteLine();
-            Console.WriteLine("Initializing...");
-
-            //string pat = "rahfqiseaujjsyj5qv7o25yghyicy3cgtrqu3cse267be52lu2na";
-            string pat = "vmi4rbndghwzyea7camsnkj5jmb6u4za23vyt7xahg2texklfiwa"; // PAT from your ORG
-            string basePat = Convert.ToBase64String(Encoding.ASCII.GetBytes(string.Format("{0}:{1}", "", pat)));
-
-            UrlParameters parameters = new UrlParameters();
-            parameters.Project = "URBIS"; // Project name 
-            parameters.Account = "financialservices"; // Organization Name
-            parameters.UriString = "https://dev.azure.com/" + parameters.Account + "/" + parameters.Project;
-            parameters.PatBase = basePat;
-            parameters.Pat = pat;
-            //List<Tuple<string, string, double>> workItemIteration_cWork = new List<Tuple<string, string, double>>();
-            List<WorkItemWithIteration> workItemIteration_cWork = new List<WorkItemWithIteration>();
-            Console.WriteLine($"Fetching work item details from https://dev.azure.com/{parameters.Project}");
-
-            List<WorkItems> workItemsList = GetWorkItemsfromSource("Task", parameters);
-            Console.WriteLine("Taking summation of completed work");
-
-            if (workItemsList.Count > 0)
+            try
             {
-                List<string> users = new List<string>();
-                foreach (var ItemList in workItemsList)
+                path = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().GetName().CodeBase);
+                path = path.Replace("file:\\", "");
+                Console.WriteLine(path);
+                Console.WriteLine();
+                Console.WriteLine();
+                logFile = path + "\\GetReport-" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt";
+                Console.WriteLine("Enter Organization Name");
+                string OrgName = Console.ReadLine();
+
+                Console.WriteLine("Enter Project Name");
+                string projectName = Console.ReadLine();
+
+                Console.WriteLine("Enter PAT");
+                string pat = Console.ReadLine();
+
+                Console.WriteLine("Initializing...");
+                string basePat = string.Empty;
+
+                string Filepath = string.Empty;
+
+                do
                 {
-                    foreach (var workItem in ItemList.value)
+                    Console.WriteLine("Enter the file path : Should end with .xlsx or .xls");
+                    Filepath = Console.ReadLine();
+                } while (!File.Exists(Filepath));
+                do
+                {
+                    Console.WriteLine("Enter Sheet Name");
+                    sheetName = Console.ReadLine();
+                } while (string.IsNullOrEmpty(sheetName));
+                //string pat = "rahfqiseaujjsyj5qv7o25yghyicy3cgtrqu3cse267be52lu2na";
+                //string pat = "vmi4rbndghwzyea7camsnkj5jmb6u4za23vyt7xahg2texklfiwa"; // PAT from your ORG
+                if (string.IsNullOrEmpty(pat) || string.IsNullOrEmpty(OrgName) || string.IsNullOrEmpty(projectName))
+                {
+                    Console.WriteLine("Please enter all the details");
+                    WriteFileToDisk("", "Please enter all the details");
+                    Console.ReadLine();
+                    return;
+                }
+                else
+                {
+                    basePat = Convert.ToBase64String(Encoding.ASCII.GetBytes(string.Format("{0}:{1}", "", pat)));
+                }
+
+                UrlParameters parameters = new UrlParameters();
+                parameters.Project = projectName;// Project name 
+                parameters.Account = OrgName; // Organization Name
+                parameters.UriString = "https://dev.azure.com/" + parameters.Account + "/" + parameters.Project;
+                parameters.PatBase = basePat;
+                parameters.Pat = pat;
+
+
+                WriteFileToDisk("Entered Details", "\t Organization: " + OrgName + "\t Project Name: " + projectName);
+
+                List<WorkItemWithIteration> workItemIteration_cWork = new List<WorkItemWithIteration>();
+                Console.WriteLine($"Fetching work item details from https://dev.azure.com/{parameters.Project}");
+
+                WriteFileToDisk("Entered Details", $"Fetching work item details from https://dev.azure.com/{parameters.Project}");
+
+                List<WorkItems> workItemsList = GetWorkItemsfromSource("Task", parameters);
+                Console.WriteLine("Taking summation of completed work");
+                WriteFileToDisk("", "Taking summation of completed work");
+
+                if (workItemsList.Count > 0)
+                {
+                    List<string> users = new List<string>();
+                    foreach (var ItemList in workItemsList)
                     {
-                        var element = workItemIteration_cWork.Find(e => e.UserName == workItem.fields.SystemAssignedTo.uniqueName && e.IterationPath == workItem.fields.SystemIterationPath);
-                        if (element != null)
-                            element.Value = element.Value + workItem.fields.MicrosoftVSTSSchedulingCompletedWork;
-                        else
-                            workItemIteration_cWork.Add(new WorkItemWithIteration
+                        foreach (var workItem in ItemList.value)
+                        {
+                            var element = workItemIteration_cWork.Find(e => e.UserName == workItem.fields.SystemAssignedTo.uniqueName && e.IterationPath == workItem.fields.SystemIterationPath);
+                            if (element != null)
                             {
-                                UserName = workItem.fields.SystemAssignedTo.uniqueName,
-                                IterationPath = workItem.fields.SystemIterationPath,
-                                Value = workItem.fields.MicrosoftVSTSSchedulingCompletedWork
-                            });
+                                element.Value = element.Value + workItem.fields.MicrosoftVSTSSchedulingCompletedWork;
+                            }
+                            else
+                            {
+                                workItemIteration_cWork.Add(new WorkItemWithIteration
+                                {
+                                    UserName = workItem.fields.SystemAssignedTo.uniqueName,
+                                    IterationPath = workItem.fields.SystemIterationPath,
+                                    Value = workItem.fields.MicrosoftVSTSSchedulingCompletedWork
+                                });
+                            }
+                        }
                     }
                 }
+
+                DataTable dtworkItem = ExportToDataTable(workItemIteration_cWork);
+
+
+                //var workIterationFromTimeSheet = ReadDataFromExcel(Filepath);
+                Console.WriteLine($"Reading Time sheet data from the file path {Filepath}");
+                WriteFileToDisk("", $"Reading Time sheet data from the file path {Filepath}");
+
+                DataSet ds = ReadExcel(Filepath, sheetName);
+                readUserAndIterationFromTimeSheet(ds.Tables[0]);
+
+                Console.WriteLine("Comparing TimeSheet data with Azure DevOps data. Please wait...");
+                WriteFileToDisk("", "Comparing TimeSheet data with Azure DevOps data. Please wait...");
+                DataTable compareData = Comparetable(dtworkItem, ds.Tables[0]);
+
+                ExportDataToExcel(compareData);
+                //var workIterationFromDataTable = ReadDataFromDataTable(ds.Tables[0]);
+                Console.WriteLine("Completed sucessfully, press any key to exit..");
+                WriteFileToDisk("", "Comparing TimeSheet data with Azure DevOps data. Please wait...");
+
+                Console.ReadLine();
             }
-
-            DataTable dtworkItem = ExportToDataTable(workItemIteration_cWork);
-
-            string Filepath = @"D:\Unisys\TimeSheetReportNew.xlsx";
-            //var workIterationFromTimeSheet = ReadDataFromExcel(Filepath);
-            Console.WriteLine($"Reading Time sheet data from the file path {Filepath}");
-
-            DataSet ds = ReadExcel(Filepath, "Sheet3");
-            readUserAndIterationFromTimeSheet(ds.Tables[0]);
-
-            Console.WriteLine("Comparing TimeSheet data with Azure DevOps data. Please wait...");
-            DataTable compareData = Comparetable(dtworkItem, ds.Tables[0]);
-
-            ExportDataToExcel(compareData);
-            //var workIterationFromDataTable = ReadDataFromDataTable(ds.Tables[0]);
-            Console.WriteLine("Completed sucessfully, press any key to exit..");
-
-            Console.ReadLine();
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"Sorry, we ran into some issue. Please check the Debug logs {logFile}");
+                Console.ReadLine();
+                WriteFileToDisk("Main ", ex.Message + Environment.NewLine + ex.StackTrace);
+            }
         }
 
         public static List<WorkItems> GetWorkItemsfromSource(string workItemType, UrlParameters parameters)
@@ -143,6 +201,7 @@ namespace unisys
             catch (Exception ex)
             {
                 string error = ex.Message;
+                WriteFileToDisk("GetWorkItemsfromSource", ex.Message + Environment.NewLine + ex.StackTrace);
             }
             return new List<WorkItemFetchResponse.WorkItems>();
         }
@@ -181,6 +240,7 @@ namespace unisys
             catch (Exception ex)
             {
                 string error = ex.Message;
+                WriteFileToDisk("GetWorkItemsDetailInBatch", ex.Message + Environment.NewLine + ex.StackTrace);
             }
             return viewModelList;
         }
@@ -189,31 +249,37 @@ namespace unisys
         public static DataSet ReadExcel(string excelFilePath, string workSheetName)
         {
             DataSet dsWorkbook = new DataSet();
-
-            string connectionString = string.Empty;
-
-            switch (Path.GetExtension(excelFilePath).ToUpperInvariant())
+            try
             {
-                case ".XLS":
-                    connectionString = string.Format("Provider=Microsoft.Jet.OLEDB.4.0; Data Source={0}; Extended Properties=Excel 8.0;", excelFilePath);
-                    break;
 
-                case ".XLSX":
-                    connectionString = string.Format("Provider=Microsoft.ACE.OLEDB.12.0;Data Source={0}; Extended Properties=Excel 12.0;", excelFilePath);
-                    break;
+                string connectionString = string.Empty;
 
-            }
-
-            if (!String.IsNullOrEmpty(connectionString))
-            {
-                string selectStatement = string.Format("SELECT * FROM [{0}$]", workSheetName);
-
-                using (OleDbDataAdapter adapter = new OleDbDataAdapter(selectStatement, connectionString))
+                switch (Path.GetExtension(excelFilePath).ToUpperInvariant())
                 {
-                    adapter.Fill(dsWorkbook, workSheetName);
+                    case ".XLS":
+                        connectionString = string.Format("Provider=Microsoft.Jet.OLEDB.4.0; Data Source={0}; Extended Properties=Excel 8.0;", excelFilePath);
+                        break;
+
+                    case ".XLSX":
+                        connectionString = string.Format("Provider=Microsoft.ACE.OLEDB.12.0;Data Source={0}; Extended Properties=Excel 12.0;", excelFilePath);
+                        break;
+
+                }
+
+                if (!String.IsNullOrEmpty(connectionString))
+                {
+                    string selectStatement = string.Format("SELECT * FROM [{0}$]", workSheetName);
+
+                    using (OleDbDataAdapter adapter = new OleDbDataAdapter(selectStatement, connectionString))
+                    {
+                        adapter.Fill(dsWorkbook, workSheetName);
+                    }
                 }
             }
-
+            catch (Exception ex)
+            {
+                WriteFileToDisk("ReadExcel", ex.Message + Environment.NewLine + ex.StackTrace);
+            }
             return dsWorkbook;
         }
 
@@ -221,45 +287,57 @@ namespace unisys
         public static List<WorkItemWithIteration> ReadDataFromExcel(string excelFilePath)
         {
             List<WorkItemWithIteration> workItemIteration = new List<WorkItemWithIteration>();
-
-            Microsoft.Office.Interop.Excel.Application appExl = new Microsoft.Office.Interop.Excel.Application();
-            Microsoft.Office.Interop.Excel.Workbook workbook = appExl.Workbooks.Open(excelFilePath);
-            Microsoft.Office.Interop.Excel._Worksheet NwSheet = workbook.Sheets[1];
-            Microsoft.Office.Interop.Excel.Range ShtRange = NwSheet.UsedRange;
-
-            int rowCount = ShtRange.Rows.Count;
-            int colCount = ShtRange.Columns.Count;
-
-            int rowindex = 0;
-            DataTable dt = new DataTable();
-            for (int i = 5; i <= rowCount; i++)
+            try
             {
-                if (ShtRange.Cells[i, 1] != null && ShtRange.Cells[i, 1].Value2 != null)
+                Microsoft.Office.Interop.Excel.Application appExl = new Microsoft.Office.Interop.Excel.Application();
+                Microsoft.Office.Interop.Excel.Workbook workbook = appExl.Workbooks.Open(excelFilePath);
+                Microsoft.Office.Interop.Excel._Worksheet NwSheet = workbook.Sheets[1];
+                Microsoft.Office.Interop.Excel.Range ShtRange = NwSheet.UsedRange;
+
+                int rowCount = ShtRange.Rows.Count;
+                int colCount = ShtRange.Columns.Count;
+
+                int rowindex = 0;
+                DataTable dt = new DataTable();
+                for (int i = 5; i <= rowCount; i++)
                 {
-                    if (ShtRange.Cells[i, 1].Value2.ToString() == "Row Labels")
+                    if (ShtRange.Cells[i, 1] != null && ShtRange.Cells[i, 1].Value2 != null)
                     {
-                        rowindex = i;
-                    }
-                }
-                if (i > rowindex)
-                {
-                    for (int j = 2; j <= colCount - 1; j++)
-                    {
-                        if (ShtRange.Cells[i, j] != null && ShtRange.Cells[i, j].Value2 != null)
+                        if (ShtRange.Cells[i, 1].Value2.ToString() == "Row Labels")
                         {
-                            WorkItemWithIteration wrkitem = new WorkItemWithIteration();
-                            if (ShtRange.Cells[i, 1] != null && ShtRange.Cells[i, 1].Value2 != null)
-                                wrkitem.UserName = ShtRange.Cells[i, 1].Value2.ToString();
-                            if (ShtRange.Cells[rowindex, 1] != null && ShtRange.Cells[rowindex, 1].Value2 != null)
-                                wrkitem.IterationPath = ShtRange.Cells[rowindex, j].Value2.ToString();
+                            rowindex = i;
+                        }
+                    }
+                    if (i > rowindex)
+                    {
+                        for (int j = 2; j <= colCount - 1; j++)
+                        {
                             if (ShtRange.Cells[i, j] != null && ShtRange.Cells[i, j].Value2 != null)
                             {
-                                wrkitem.Value = Convert.ToDouble(ShtRange.Cells[i, j].Value2.ToString() == "" ? 0 : ShtRange.Cells[i, j].Value2.ToString());
-                                workItemIteration.Add(wrkitem);
+                                WorkItemWithIteration wrkitem = new WorkItemWithIteration();
+                                if (ShtRange.Cells[i, 1] != null && ShtRange.Cells[i, 1].Value2 != null)
+                                {
+                                    wrkitem.UserName = ShtRange.Cells[i, 1].Value2.ToString();
+                                }
+
+                                if (ShtRange.Cells[rowindex, 1] != null && ShtRange.Cells[rowindex, 1].Value2 != null)
+                                {
+                                    wrkitem.IterationPath = ShtRange.Cells[rowindex, j].Value2.ToString();
+                                }
+
+                                if (ShtRange.Cells[i, j] != null && ShtRange.Cells[i, j].Value2 != null)
+                                {
+                                    wrkitem.Value = Convert.ToDouble(ShtRange.Cells[i, j].Value2.ToString() == "" ? 0 : ShtRange.Cells[i, j].Value2.ToString());
+                                    workItemIteration.Add(wrkitem);
+                                }
                             }
                         }
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                WriteFileToDisk("ReadDataFromExcel", ex.Message + Environment.NewLine + ex.StackTrace);
             }
             return workItemIteration;
         }
@@ -268,30 +346,43 @@ namespace unisys
         public static List<WorkItemWithIteration> ReadDataFromDataTable(DataTable dt)
         {
             List<WorkItemWithIteration> workItemIteration = new List<WorkItemWithIteration>();
-            int rowindex = 0;
-            for (int i = 5; i < dt.Rows.Count; i++)
+            try
             {
-                if (dt.Rows[i][1].ToString() == "Row Labels")
+                int rowindex = 0;
+                for (int i = 5; i < dt.Rows.Count; i++)
                 {
-                    rowindex = i;
-                }
-                if (i > rowindex)
-                {
-                    for (int j = 0; j < dt.Columns.Count - 1; j++)
+                    if (dt.Rows[i][1].ToString() == "Row Labels")
                     {
-                        WorkItemWithIteration wrkitem = new WorkItemWithIteration();
-                        if (dt.Rows[i][0] != null)
-                            wrkitem.UserName = dt.Rows[i][0].ToString();
-                        if (dt.Rows[rowindex][0] != null)
-                            wrkitem.IterationPath = dt.Rows[rowindex][j].ToString();
-                        if (dt.Rows[i][j] != null)
+                        rowindex = i;
+                    }
+                    if (i > rowindex)
+                    {
+                        for (int j = 0; j < dt.Columns.Count - 1; j++)
                         {
-                            wrkitem.Value = Convert.ToDouble(dt.Rows[i][j].ToString() == "" ? 0 : dt.Rows[i][j]);
-                            workItemIteration.Add(wrkitem);
+                            WorkItemWithIteration wrkitem = new WorkItemWithIteration();
+                            if (dt.Rows[i][0] != null)
+                            {
+                                wrkitem.UserName = dt.Rows[i][0].ToString();
+                            }
+
+                            if (dt.Rows[rowindex][0] != null)
+                            {
+                                wrkitem.IterationPath = dt.Rows[rowindex][j].ToString();
+                            }
+
+                            if (dt.Rows[i][j] != null)
+                            {
+                                wrkitem.Value = Convert.ToDouble(dt.Rows[i][j].ToString() == "" ? 0 : dt.Rows[i][j]);
+                                workItemIteration.Add(wrkitem);
+                            }
                         }
                     }
-                }
 
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteFileToDisk("ReadDataFromDataTable", ex.Message + Environment.NewLine + ex.StackTrace);
             }
             return workItemIteration;
         }
@@ -367,6 +458,7 @@ namespace unisys
             catch (Exception ex)
             {
                 Console.Write(ex.Message);
+                WriteFileToDisk("ExportDataToExcel", ex.Message + Environment.NewLine + ex.StackTrace);
                 Console.ReadLine();
             }
 
@@ -375,120 +467,156 @@ namespace unisys
         public static DataTable ExportToDataTable(List<WorkItemWithIteration> workItem)
         {
             DataTable dt = new DataTable();
-
-            foreach (var witem in workItem)
+            try
             {
-                if (!iterationList.Contains(witem.IterationPath))
-                    iterationList.Add(witem.IterationPath);
-                if (!UserList.Contains(witem.UserName))
-                    UserList.Add(witem.UserName);
-            }
-            if (!dt.Columns.Contains("Row Labels"))
-            {
-                dt.Columns.Add("Row Labels", typeof(string));
-            }
-            foreach (string str in iterationList)
-            {
-                if (!dt.Columns.Contains(str))
+                foreach (var witem in workItem)
                 {
-                    dt.Columns.Add(str, typeof(string));
+                    if (!iterationList.Contains(witem.IterationPath))
+                    {
+                        iterationList.Add(witem.IterationPath);
+                    }
+
+                    if (!UserList.Contains(witem.UserName))
+                    {
+                        UserList.Add(witem.UserName);
+                    }
+                }
+                if (!dt.Columns.Contains("Row Labels"))
+                {
+                    dt.Columns.Add("Row Labels", typeof(string));
+                }
+                foreach (string str in iterationList)
+                {
+                    if (!dt.Columns.Contains(str))
+                    {
+                        dt.Columns.Add(str, typeof(string));
+                    }
+                }
+                foreach (string struser in UserList)
+                {
+                    dt.Rows.Add();
+                }
+                for (int i = 0; i < dt.Rows.Count; i++)
+                {
+                    dt.Rows[i]["Row Labels"] = UserList[i];
+                    foreach (DataColumn dc in dt.Columns)
+                    {
+                        string column = dc.ColumnName;
+                        var element = workItem.Find(e => e.UserName == UserList[i] && e.IterationPath == column);
+                        if (element != null)
+                        {
+                            dt.Rows[i][column] = element.Value.ToString();
+                        }
+                    }
                 }
             }
-            foreach (string struser in UserList)
+            catch (Exception ex)
             {
-                dt.Rows.Add();
+                WriteFileToDisk("ExportToDataTable", ex.Message + Environment.NewLine + ex.StackTrace);
             }
-            for (int i = 0; i < dt.Rows.Count; i++)
-            {
-                dt.Rows[i]["Row Labels"] = UserList[i];
-                foreach (DataColumn dc in dt.Columns)
-                {
-                    string column = dc.ColumnName;
-                    var element = workItem.Find(e => e.UserName == UserList[i] && e.IterationPath == column);
-                    if (element != null)
-                        dt.Rows[i][column] = element.Value.ToString();
-                }
-            }
-
             return dt;
         }
 
         public static DataTable Comparetable(DataTable dtVsts, DataTable dtTimesheet)
         {
             DataTable dt = new DataTable();
-            for (int j = 0; j < dtTimesheet.Columns.Count; j++)
+            try
             {
-
-                if (j == 0)
-                {
-                    dt.Columns.Add(dtTimesheet.Columns[j].ColumnName);
-                }
-                else if (dtTimesheet.Columns[j].ColumnName.Trim() != "Grand Total")
-                {
-                    dt.Columns.Add(dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-VSTS");
-                    dt.Columns.Add(dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-TS");
-                    dt.Columns.Add(dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-Diff");
-                }
-            }
-            foreach (var user in UserList)
-            {
-                dt.Rows.Add();
-            }
-
-            for (int i = 0; i < dt.Rows.Count; i++)
-            {
-                dt.Rows[i]["Row Labels"] = UserList[i];
                 for (int j = 0; j < dtTimesheet.Columns.Count; j++)
                 {
-                    if (j > 0 && dtTimesheet.Columns[j].ColumnName.Trim() != "Grand Total")
+
+                    if (j == 0)
                     {
+                        dt.Columns.Add(dtTimesheet.Columns[j].ColumnName);
+                    }
+                    else if (dtTimesheet.Columns[j].ColumnName.Trim() != "Grand Total")
+                    {
+                        dt.Columns.Add(dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-VSTS");
+                        dt.Columns.Add(dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-TS");
+                        dt.Columns.Add(dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-Diff");
+                    }
+                }
+                foreach (var user in UserList)
+                {
+                    dt.Rows.Add();
+                }
 
-                        string Column = dtTimesheet.Columns[j].ColumnName;
-                        var TimesheetVal = dtTimesheet.Rows[i][Column].ToString() == "" ? 0 : Convert.ToDouble(dtTimesheet.Rows[i][Column].ToString());
-                        double vstsVal = 0;
-                        if (dtVsts.Columns.Contains(Column) && i < dtVsts.Rows.Count)
+                for (int i = 0; i < dt.Rows.Count; i++)
+                {
+                    dt.Rows[i]["Row Labels"] = UserList[i];
+                    for (int j = 0; j < dtTimesheet.Columns.Count; j++)
+                    {
+                        if (j > 0 && dtTimesheet.Columns[j].ColumnName.Trim() != "Grand Total")
                         {
-                            int rowindex = 0;
-                            for (int k = 0; k < dtVsts.Rows.Count; k++)
+
+                            string Column = dtTimesheet.Columns[j].ColumnName;
+                            var TimesheetVal = dtTimesheet.Rows[i][Column].ToString() == "" ? 0 : Convert.ToDouble(dtTimesheet.Rows[i][Column].ToString());
+                            double vstsVal = 0;
+                            if (dtVsts.Columns.Contains(Column) && i < dtVsts.Rows.Count)
                             {
-                                string value = dtVsts.Rows[k]["Row Labels"].ToString();
-                                if (UserList[i].ToLower() == value.ToLower())
+                                int rowindex = 0;
+                                for (int k = 0; k < dtVsts.Rows.Count; k++)
                                 {
-                                    rowindex = k;
-                                    break;
+                                    string value = dtVsts.Rows[k]["Row Labels"].ToString();
+                                    if (UserList[i].ToLower() == value.ToLower())
+                                    {
+                                        rowindex = k;
+                                        break;
+                                    }
+
                                 }
-
+                                if (UserList[i].ToLower() == dtVsts.Rows[rowindex]["Row Labels"].ToString().ToLower())
+                                {
+                                    vstsVal = dtVsts.Rows[rowindex][Column].ToString() == "" ? 0 : Convert.ToDouble(dtVsts.Rows[rowindex][Column].ToString());
+                                }
                             }
-                            if (UserList[i].ToLower() == dtVsts.Rows[rowindex]["Row Labels"].ToString().ToLower())
-                                vstsVal = dtVsts.Rows[rowindex][Column].ToString() == "" ? 0 : Convert.ToDouble(dtVsts.Rows[rowindex][Column].ToString());
+
+                            var difference = vstsVal - TimesheetVal;
+
+                            dt.Rows[i][dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-TS"] = TimesheetVal.ToString();
+                            dt.Rows[i][dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-VSTS"] = vstsVal.ToString();
+                            dt.Rows[i][dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-Diff"] = difference.ToString();
                         }
-
-                        var difference = vstsVal - TimesheetVal;
-
-                        dt.Rows[i][dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-TS"] = TimesheetVal.ToString();
-                        dt.Rows[i][dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-VSTS"] = vstsVal.ToString();
-                        dt.Rows[i][dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-Diff"] = difference.ToString();
                     }
                 }
             }
-
+            catch (Exception ex)
+            {
+                WriteFileToDisk("Comparetable", ex.Message + Environment.NewLine + ex.StackTrace);
+            }
             return dt;
         }
 
         public static void readUserAndIterationFromTimeSheet(DataTable dt)
         {
-            UserList = new List<string>();
-            iterationList = new List<string>();
-            foreach (DataRow dr in dt.Rows)
+            try
             {
-                if (!UserList.Contains(dr["Row Labels"].ToString()))
-                    UserList.Add(dr["Row Labels"].ToString());
+                UserList = new List<string>();
+                iterationList = new List<string>();
+                foreach (DataRow dr in dt.Rows)
+                {
+                    if (!UserList.Contains(dr["Row Labels"].ToString()))
+                    {
+                        UserList.Add(dr["Row Labels"].ToString());
+                    }
+                }
+                for (int i = 1; i < dt.Columns.Count; i++)
+                {
+                    if (!iterationList.Contains(dt.Columns[i].ColumnName))
+                    {
+                        iterationList.Add(dt.Columns[i].ColumnName);
+                    }
+                }
             }
-            for (int i = 1; i < dt.Columns.Count; i++)
+            catch (Exception ex)
             {
-                if (!iterationList.Contains(dt.Columns[i].ColumnName))
-                    iterationList.Add(dt.Columns[i].ColumnName);
+                WriteFileToDisk("readUserAndIterationFromTimeSheet", ex.Message + Environment.NewLine + ex.StackTrace);
             }
+        }
+
+        private static void WriteFileToDisk(string label, string dataToWriteFile)
+        {
+            File.AppendAllText(logFile, DateTime.Now.ToString("yyyy:MM:dd:HH:MM:ss") + "\t" + label + "\t" + dataToWriteFile);
         }
     }
 }
