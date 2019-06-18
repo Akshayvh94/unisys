@@ -9,7 +9,7 @@ namespace unisys.Models
         public class WorkItems
         {
             public int count { get; set; }
-            public IList<Value> value { get; set; }
+            public List<Value> value { get; set; }
         }
         public class Value
         {
