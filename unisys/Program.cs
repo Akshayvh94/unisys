@@ -15,6 +15,8 @@ namespace unisys
 {
     internal class Program
     {
+        public static List<string> iterationList = new List<string>();
+        public static List<string> UserList = new List<string>();
         private static void Main(string[] args)
         {
             var path = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().GetName().CodeBase);
@@ -56,16 +58,21 @@ namespace unisys
                 }
             }
 
-            string Filepath = @"D:\Unisys\Anwar Report.xlsx";            
-            var workIterationFromTimeSheet= ReadDataFromExcel(Filepath);
+            DataTable dtworkItem = ExportToDataTable(workItemIteration_cWork);
 
-            DataSet ds = ReadExcel(Filepath, "Sheet1");
-            var workIterationFromDataTable = ReadDataFromDataTable(ds.Tables[0]);
+            string Filepath = @"D:\Unisys\Testfile1.xlsx";
+            //var workIterationFromTimeSheet = ReadDataFromExcel(Filepath);
+
+            DataSet ds = ReadExcel(Filepath, "Sheet2");
+
+            DataTable compareData = Comparetable(dtworkItem, ds.Tables[0]);
+
+            ExportDataToExcel(compareData);
+            //var workIterationFromDataTable = ReadDataFromDataTable(ds.Tables[0]);
 
 
             Console.ReadLine();
         }
-
 
         public static List<WorkItemFetchResponse.WorkItems> GetWorkItemsfromSource(string workItemType, UrlParameters parameters)
         {
@@ -77,7 +84,7 @@ namespace unisys
                 Object wiql = new
                 {
                     //select [System.Id], [System.WorkItemType], [System.Title], [System.AssignedTo], [System.State], [System.IterationPath], [Microsoft.VSTS.Scheduling.CompletedWork] from WorkItems where [System.TeamProject] = @project and [System.WorkItemType] = 'Task' and [System.State] <> '' and [System.IterationPath] = 'unisys\\Iteration 1'
-                    query = "select [System.Id], [System.WorkItemType], [System.Title], [System.AssignedTo], [System.State], [System.IterationPath], [Microsoft.VSTS.Scheduling.CompletedWork] from WorkItems where [System.TeamProject] = '" + parameters.Project + "' and [System.WorkItemType] = 'Task' and [System.State] <> '' and [System.IterationPath] = 'unisys\\Iteration 1'"
+                    query = "select [System.Id], [System.WorkItemType], [System.Title], [System.AssignedTo], [System.State], [System.IterationPath], [Microsoft.VSTS.Scheduling.CompletedWork] from WorkItems where [System.TeamProject] = '" + parameters.Project + "' and [System.WorkItemType] = 'Task' and [System.State] <> '' and [System.IterationPath] under 'unisys'"
                 };
                 using (var client = new HttpClient())
                 {
@@ -225,9 +232,9 @@ namespace unisys
                         rowindex = i;
                     }
                 }
-                if(i>rowindex)
+                if (i > rowindex)
                 {
-                    for (int j = 2; j <= colCount-1; j++)
+                    for (int j = 2; j <= colCount - 1; j++)
                     {
                         if (ShtRange.Cells[i, j] != null && ShtRange.Cells[i, j].Value2 != null)
                         {
@@ -244,7 +251,7 @@ namespace unisys
                         }
                     }
                 }
-                
+
                 Console.WriteLine();
             }
             return workItemIteration;
@@ -255,15 +262,15 @@ namespace unisys
         {
             List<WorkItemWithIteration> workItemIteration = new List<WorkItemWithIteration>();
             int rowindex = 0;
-            for(int i=5; i < dt.Rows.Count; i++)
+            for (int i = 5; i < dt.Rows.Count; i++)
             {
-                if(dt.Rows[i][1].ToString()== "Row Labels")
+                if (dt.Rows[i][1].ToString() == "Row Labels")
                 {
                     rowindex = i;
                 }
                 if (i > rowindex)
                 {
-                    for (int j = 0; j < dt.Columns.Count-1; j++)
+                    for (int j = 0; j < dt.Columns.Count - 1; j++)
                     {
                         WorkItemWithIteration wrkitem = new WorkItemWithIteration();
                         if (dt.Rows[i][0] != null)
@@ -277,9 +284,168 @@ namespace unisys
                         }
                     }
                 }
-                
+
             }
             return workItemIteration;
+        }
+
+        public static void ExportDataToExcel(DataTable dtWorklist)
+        {
+            Microsoft.Office.Interop.Excel.Application excel;
+            Microsoft.Office.Interop.Excel.Workbook worKbooK;
+            Microsoft.Office.Interop.Excel.Worksheet worKsheeT;
+            Microsoft.Office.Interop.Excel.Range celLrangE;
+
+            try
+            {
+                excel = new Microsoft.Office.Interop.Excel.Application();
+                excel.Visible = false;
+                excel.DisplayAlerts = false;
+                worKbooK = excel.Workbooks.Add(Type.Missing);
+
+
+                worKsheeT = (Microsoft.Office.Interop.Excel.Worksheet)worKbooK.ActiveSheet;
+                worKsheeT.Name = "Result";
+
+                worKsheeT.Range[worKsheeT.Cells[1, 1], worKsheeT.Cells[1, 8]].Merge();
+                worKsheeT.Cells[1, 1] = "Cosolidated compared data between Azure Devops and TimeSheet Data";
+                worKsheeT.Cells.Font.Size = 10;
+
+
+                int rowcount = 2;
+
+                foreach (DataRow datarow in dtWorklist.Rows)
+                {
+                    rowcount += 1;
+                    for (int i = 1; i <= dtWorklist.Columns.Count; i++)
+                    {
+
+                        if (rowcount == 3)
+                        {
+                            worKsheeT.Cells[2, i] = dtWorklist.Columns[i - 1].ColumnName;
+                            worKsheeT.Cells.Font.Color = System.Drawing.Color.Black;
+                        }
+
+                        worKsheeT.Cells[rowcount, i] = datarow[i - 1].ToString();
+
+                        if (rowcount > 3)
+                        {
+                            if (i == dtWorklist.Columns.Count)
+                            {
+                                if (rowcount % 2 == 0)
+                                {
+                                    celLrangE = worKsheeT.Range[worKsheeT.Cells[rowcount, 1], worKsheeT.Cells[rowcount, dtWorklist.Columns.Count]];
+                                }
+
+                            }
+                        }
+
+                    }
+
+                }
+
+                celLrangE = worKsheeT.Range[worKsheeT.Cells[1, 1], worKsheeT.Cells[rowcount, dtWorklist.Columns.Count]];
+                celLrangE.EntireColumn.AutoFit();
+                Microsoft.Office.Interop.Excel.Borders border = celLrangE.Borders;
+                border.LineStyle = Microsoft.Office.Interop.Excel.XlLineStyle.xlContinuous;
+                border.Weight = 2d;
+
+                celLrangE = worKsheeT.Range[worKsheeT.Cells[1, 1], worKsheeT.Cells[2, dtWorklist.Columns.Count]];
+
+                worKbooK.SaveAs(@"D:\test2.xlsx");
+                worKbooK.Close();
+                excel.Quit();
+
+            }
+            catch (Exception ex)
+            {
+
+            }
+
+        }
+
+        public static DataTable ExportToDataTable(List<WorkItemWithIteration> workItem)
+        {
+            DataTable dt = new DataTable();
+
+            foreach (var witem in workItem)
+            {
+                if (!iterationList.Contains(witem.IterationPath))
+                    iterationList.Add(witem.IterationPath);
+                if (!UserList.Contains(witem.UserName))
+                    UserList.Add(witem.UserName);
+            }
+            if (!dt.Columns.Contains("Row Labels"))
+            {
+                dt.Columns.Add("Row Labels", typeof(string));
+            }
+            foreach (string str in iterationList)
+            {
+                if (!dt.Columns.Contains(str))
+                {
+                    dt.Columns.Add(str, typeof(string));
+                }
+            }
+            foreach (string struser in UserList)
+            {
+                dt.Rows.Add();
+            }
+            for (int i = 0; i < dt.Rows.Count; i++)
+            {
+                dt.Rows[i]["Row Labels"] = UserList[i];
+                foreach (DataColumn dc in dt.Columns)
+                {
+                    string column = dc.ColumnName;
+                    var element = workItem.Find(e => e.UserName == UserList[i] && e.IterationPath == column);
+                    if (element != null)
+                        dt.Rows[i][column] = element.Value.ToString();
+                }
+            }
+
+            return dt;
+        }
+
+        public static DataTable Comparetable(DataTable dtVsts, DataTable dtTimesheet)
+        {
+            DataTable dt = new DataTable();
+            for (int j = 0; j < dtVsts.Columns.Count; j++)
+            {
+                if (j == 0)
+                {
+                    dt.Columns.Add(dtVsts.Columns[j].ColumnName);
+                }
+                else
+                {
+                    dt.Columns.Add(dtVsts.Columns[j].ColumnName + "-vsts");
+                    dt.Columns.Add(dtVsts.Columns[j].ColumnName + "-TimeSheet");
+                    dt.Columns.Add(dtVsts.Columns[j].ColumnName + "-Difference");
+                }
+            }
+            foreach(var user in UserList)
+            {
+                dt.Rows.Add();
+            }
+
+            for (int i = 0; i < dt.Rows.Count; i++)
+            {
+                dt.Rows[i]["Row Labels"] = UserList[i];
+                for (int j = 0; j < dtVsts.Columns.Count; j++)
+                {
+                    if (j > 0)
+                    {
+                        string Column = dtVsts.Columns[j].ColumnName;
+                        var vstsVal = dtVsts.Rows[i][Column].ToString()=="" ? 0 : Convert.ToDouble(dtVsts.Rows[i][Column].ToString());
+                        var TimesheetVal = dtTimesheet.Rows[i][Column].ToString() == "" ? 0 : Convert.ToDouble(dtTimesheet.Rows[i][Column].ToString());
+                        var difference = TimesheetVal - vstsVal;
+
+                        dt.Rows[i][dtVsts.Columns[j].ColumnName + "-vsts"] = vstsVal.ToString();
+                        dt.Rows[i][dtVsts.Columns[j].ColumnName + "-TimeSheet"] = TimesheetVal.ToString();
+                        dt.Rows[i][dtVsts.Columns[j].ColumnName + "-Difference"] = difference.ToString();
+                    }                   
+                }               
+            }
+
+            return dt;
         }
     }
 }
