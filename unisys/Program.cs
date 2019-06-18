@@ -438,15 +438,16 @@ namespace unisys
         public static DataTable Comparetable(DataTable dtVsts, DataTable dtTimesheet)
         {
             DataTable dt = new DataTable();
-            for (int j = 0; j < dtTimesheet.Columns.Count-1; j++)
+            for (int j = 0; j < dtTimesheet.Columns.Count; j++)
             {
+
                 if (j == 0)
                 {
                     dt.Columns.Add(dtTimesheet.Columns[j].ColumnName);
                 }
-                else 
+                else if (dtTimesheet.Columns[j].ColumnName.Trim() != "Grand Total")
                 {
-                    dt.Columns.Add(dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\","").Trim() + "-VSTS");
+                    dt.Columns.Add(dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-VSTS");
                     dt.Columns.Add(dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-TS");
                     dt.Columns.Add(dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-Diff");
                 }
@@ -459,9 +460,9 @@ namespace unisys
             for (int i = 0; i < dt.Rows.Count; i++)
             {
                 dt.Rows[i]["Row Labels"] = UserList[i];
-                for (int j = 0; j < dtTimesheet.Columns.Count-1; j++)
+                for (int j = 0; j < dtTimesheet.Columns.Count; j++)
                 {
-                    if (j > 0)
+                    if (j > 0 && dtTimesheet.Columns[j].ColumnName.Trim() != "Grand Total")
                     {
 
                         string Column = dtTimesheet.Columns[j].ColumnName;
