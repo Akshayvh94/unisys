@@ -416,15 +416,16 @@ namespace unisys
         public static DataTable Comparetable(DataTable dtVsts, DataTable dtTimesheet)
         {
             DataTable dt = new DataTable();
-            for (int j = 0; j < dtTimesheet.Columns.Count-1; j++)
+            for (int j = 0; j < dtTimesheet.Columns.Count; j++)
             {
+
                 if (j == 0)
                 {
                     dt.Columns.Add(dtTimesheet.Columns[j].ColumnName);
                 }
-                else 
+                else if (dtTimesheet.Columns[j].ColumnName.Trim() != "Grand Total")
                 {
-                    dt.Columns.Add(dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\","").Trim() + "-VSTS");
+                    dt.Columns.Add(dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-VSTS");
                     dt.Columns.Add(dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-TS");
                     dt.Columns.Add(dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-Diff");
                 }
@@ -437,18 +438,18 @@ namespace unisys
             for (int i = 0; i < dt.Rows.Count; i++)
             {
                 dt.Rows[i]["Row Labels"] = UserList[i];
-                for (int j = 0; j < dtTimesheet.Columns.Count-1; j++)
+                for (int j = 0; j < dtTimesheet.Columns.Count; j++)
                 {
-                    if (j > 0)
+                    if (j > 0 && dtTimesheet.Columns[j].ColumnName.Trim() != "Grand Total")
                     {
-                        
+
                         string Column = dtTimesheet.Columns[j].ColumnName;
                         var TimesheetVal = dtTimesheet.Rows[i][Column].ToString() == "" ? 0 : Convert.ToDouble(dtTimesheet.Rows[i][Column].ToString());
                         double vstsVal = 0;
-                        if (dtVsts.Columns.Contains(Column) && i<dtVsts.Rows.Count)
+                        if (dtVsts.Columns.Contains(Column) && i < dtVsts.Rows.Count)
                         {
                             int rowindex = 0;
-                            for(int k = 0; k < dtVsts.Rows.Count; k++)
+                            for (int k = 0; k < dtVsts.Rows.Count; k++)
                             {
                                 string value = dtVsts.Rows[k]["Row Labels"].ToString();
                                 if (UserList[i].ToLower() == value.ToLower())
@@ -456,12 +457,12 @@ namespace unisys
                                     rowindex = k;
                                     break;
                                 }
-                                    
+
                             }
                             if (UserList[i].ToLower() == dtVsts.Rows[rowindex]["Row Labels"].ToString().ToLower())
                                 vstsVal = dtVsts.Rows[rowindex][Column].ToString() == "" ? 0 : Convert.ToDouble(dtVsts.Rows[rowindex][Column].ToString());
                         }
-                           
+
                         var difference = vstsVal - TimesheetVal;
 
                         dt.Rows[i][dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-TS"] = TimesheetVal.ToString();
@@ -478,12 +479,12 @@ namespace unisys
         {
             UserList = new List<string>();
             iterationList = new List<string>();
-            foreach(DataRow dr in dt.Rows)
+            foreach (DataRow dr in dt.Rows)
             {
                 if (!UserList.Contains(dr["Row Labels"].ToString()))
                     UserList.Add(dr["Row Labels"].ToString());
             }
-            for(int i = 1; i < dt.Columns.Count; i++)
+            for (int i = 1; i < dt.Columns.Count; i++)
             {
                 if (!iterationList.Contains(dt.Columns[i].ColumnName))
                     iterationList.Add(dt.Columns[i].ColumnName);
