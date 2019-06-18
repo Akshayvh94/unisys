@@ -121,6 +121,7 @@ namespace unisys
                 {
                     WriteFileToDisk("", "Couldn't get the work items. Please check the Organization details and try again");
                     Console.WriteLine("Couldn't get the work items. Please check the Organization details and try again");
+                    Console.ReadLine();
                     return;
                 }
                 DataTable dtworkItem = ExportToDataTable(workItemIteration_cWork);
