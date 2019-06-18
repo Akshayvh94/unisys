@@ -25,10 +25,15 @@ namespace unisys
             {
                 path = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().GetName().CodeBase);
                 path = path.Replace("file:\\", "");
-                Console.WriteLine(path);
+                Console.WriteLine("Consolidated report from Azure DevOps and Time Sheet");
+                //Console.WriteLine(path);
                 Console.WriteLine();
                 Console.WriteLine();
-                logFile = path + "\\GetReport-" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt";
+                if (!Directory.Exists(path + "\\Logs"))
+                {
+                    Directory.CreateDirectory(path + "\\Logs");
+                }
+                logFile = path + "\\Logs\\GetReport-" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt";
                 Console.WriteLine("Enter Organization Name");
                 string OrgName = Console.ReadLine();
 
@@ -40,6 +45,18 @@ namespace unisys
 
                 Console.WriteLine("Initializing...");
                 string basePat = string.Empty;
+
+                if (string.IsNullOrEmpty(pat) || string.IsNullOrEmpty(OrgName) || string.IsNullOrEmpty(projectName))
+                {
+                    Console.WriteLine("Please enter all the details");
+                    WriteFileToDisk("", "Please enter all the details");
+                    Console.ReadLine();
+                    return;
+                }
+                else
+                {
+                    basePat = Convert.ToBase64String(Encoding.ASCII.GetBytes(string.Format("{0}:{1}", "", pat)));
+                }
 
                 string Filepath = string.Empty;
 
@@ -55,17 +72,7 @@ namespace unisys
                 } while (string.IsNullOrEmpty(sheetName));
                 //string pat = "rahfqiseaujjsyj5qv7o25yghyicy3cgtrqu3cse267be52lu2na";
                 //string pat = "vmi4rbndghwzyea7camsnkj5jmb6u4za23vyt7xahg2texklfiwa"; // PAT from your ORG
-                if (string.IsNullOrEmpty(pat) || string.IsNullOrEmpty(OrgName) || string.IsNullOrEmpty(projectName))
-                {
-                    Console.WriteLine("Please enter all the details");
-                    WriteFileToDisk("", "Please enter all the details");
-                    Console.ReadLine();
-                    return;
-                }
-                else
-                {
-                    basePat = Convert.ToBase64String(Encoding.ASCII.GetBytes(string.Format("{0}:{1}", "", pat)));
-                }
+              
 
                 UrlParameters parameters = new UrlParameters();
                 parameters.Project = projectName;// Project name 
@@ -175,7 +182,6 @@ namespace unisys
                     else
                     {
                         var errorMessage = response.Content.ReadAsStringAsync();
-                        Console.Write(errorMessage);
                     }
                     List<string> witIds = new List<string>();
                     string workitemIDstoFetch = ""; int WICtr = 0;
