@@ -117,7 +117,12 @@ namespace unisys
                         }
                     }
                 }
-
+                else
+                {
+                    WriteFileToDisk("", "Couldn't get the work items. Please check the Organization details and try again");
+                    Console.WriteLine("Couldn't get the work items. Please check the Organization details and try again");
+                    return;
+                }
                 DataTable dtworkItem = ExportToDataTable(workItemIteration_cWork);
 
 
@@ -158,7 +163,7 @@ namespace unisys
                 Object wiql = new
                 {
                     //select [System.Id], [System.WorkItemType], [System.Title], [System.AssignedTo], [System.State], [System.IterationPath], [Microsoft.VSTS.Scheduling.CompletedWork] from WorkItems where [System.TeamProject] = @project and [System.WorkItemType] = 'Task' and [System.State] <> '' and [System.IterationPath] = 'unisys\\Iteration 1'
-                    query = "select [System.Id], [System.WorkItemType], [System.Title], [System.AssignedTo], [System.State], [System.IterationPath], [Microsoft.VSTS.Scheduling.CompletedWork] from WorkItems where [System.TeamProject] = '" + parameters.Project + "' and [System.WorkItemType] = 'Task' and [System.State] <> '' and [System.IterationPath] under 'URBIS'"
+                    query = "select [System.Id], [System.WorkItemType], [System.Title], [System.AssignedTo], [System.State], [System.IterationPath], [Microsoft.VSTS.Scheduling.CompletedWork] from WorkItems where [System.TeamProject] = '" + parameters.Project + "' and [System.WorkItemType] = 'Task' and [System.State] <> '' and [System.IterationPath] under '" + parameters.Project + "'"
                 };
                 using (var client = new HttpClient())
                 {
