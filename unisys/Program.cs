@@ -438,17 +438,17 @@ namespace unisys
         public static DataTable Comparetable(DataTable dtVsts, DataTable dtTimesheet)
         {
             DataTable dt = new DataTable();
-            for (int j = 0; j < dtTimesheet.Columns.Count; j++)
+            for (int j = 0; j < dtTimesheet.Columns.Count-1; j++)
             {
                 if (j == 0)
                 {
                     dt.Columns.Add(dtTimesheet.Columns[j].ColumnName);
                 }
-                else
+                else 
                 {
-                    dt.Columns.Add(dtTimesheet.Columns[j].ColumnName + "-vsts");
-                    dt.Columns.Add(dtTimesheet.Columns[j].ColumnName + "-TimeSheet");
-                    dt.Columns.Add(dtTimesheet.Columns[j].ColumnName + "-Difference");
+                    dt.Columns.Add(dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\","").Trim() + "-VSTS");
+                    dt.Columns.Add(dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-TS");
+                    dt.Columns.Add(dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-Diff");
                 }
             }
             foreach (var user in UserList)
@@ -459,7 +459,7 @@ namespace unisys
             for (int i = 0; i < dt.Rows.Count; i++)
             {
                 dt.Rows[i]["Row Labels"] = UserList[i];
-                for (int j = 0; j < dtTimesheet.Columns.Count; j++)
+                for (int j = 0; j < dtTimesheet.Columns.Count-1; j++)
                 {
                     if (j > 0)
                     {
@@ -488,9 +488,9 @@ namespace unisys
 
                         var difference = vstsVal - TimesheetVal;
 
-                        dt.Rows[i][dtTimesheet.Columns[j].ColumnName + "-TimeSheet"] = TimesheetVal.ToString();
-                        dt.Rows[i][dtTimesheet.Columns[j].ColumnName + "-vsts"] = vstsVal.ToString();
-                        dt.Rows[i][dtTimesheet.Columns[j].ColumnName + "-Difference"] = difference.ToString();
+                        dt.Rows[i][dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-TS"] = TimesheetVal.ToString();
+                        dt.Rows[i][dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-VSTS"] = vstsVal.ToString();
+                        dt.Rows[i][dtTimesheet.Columns[j].ColumnName.Replace(@"URBIS\", "").Trim() + "-Diff"] = difference.ToString();
                     }
                 }
             }
