@@ -9,6 +9,8 @@ using System.Net.Http.Headers;
 using System.Text;
 using unisys.Models;
 using static unisys.Models.WorkItemFetchResponse;
+using OfficeOpenXml;
+using System.Linq;
 
 namespace unisys
 {
@@ -100,7 +102,8 @@ namespace unisys
                     {
                         foreach (var workItem in ItemList.value)
                         {
-                            var element = workItemIteration_cWork.Find(e => e.UserName == workItem.fields.SystemAssignedTo.uniqueName && e.IterationPath == workItem.fields.SystemIterationPath);
+                            string[] strIteration=workItem.fields.SystemIterationPath.Split('\\');
+                            var element = workItemIteration_cWork.Find(e => e.UserName == workItem.fields.SystemAssignedTo.uniqueName && e.IterationPath == strIteration[strIteration.Length-1]);
                             if (element != null)
                             {
                                 element.Value = element.Value + workItem.fields.MicrosoftVSTSSchedulingCompletedWork;
@@ -110,7 +113,7 @@ namespace unisys
                                 workItemIteration_cWork.Add(new WorkItemWithIteration
                                 {
                                     UserName = workItem.fields.SystemAssignedTo.uniqueName,
-                                    IterationPath = workItem.fields.SystemIterationPath,
+                                    IterationPath = strIteration[strIteration.Length - 1],
                                     Value = workItem.fields.MicrosoftVSTSSchedulingCompletedWork
                                 });
                             }
@@ -131,12 +134,13 @@ namespace unisys
                 Console.WriteLine($"Reading Time sheet data from the file path {Filepath}");
                 WriteFileToDisk("", $"Reading Time sheet data from the file path {Filepath}");
 
-                DataSet ds = ReadExcel(Filepath, sheetName);
-                readUserAndIterationFromTimeSheet(ds.Tables[0]);
+                //DataSet ds = ReadExcel(Filepath, sheetName);
+                DataTable dtFromTimeSheet = ExcelToDataTable(Filepath, sheetName);
+                readUserAndIterationFromTimeSheet(dtFromTimeSheet);
 
                 Console.WriteLine("Comparing TimeSheet data with Azure DevOps data. Please wait...");
                 WriteFileToDisk("", "Comparing TimeSheet data with Azure DevOps data. Please wait...");
-                DataTable compareData = Comparetable(dtworkItem, ds.Tables[0]);
+                DataTable compareData = Comparetable(dtworkItem, dtFromTimeSheet);
 
                 ExportDataToExcel(compareData);
                 //var workIterationFromDataTable = ReadDataFromDataTable(ds.Tables[0]);
@@ -217,7 +221,7 @@ namespace unisys
             }
             return new List<WorkItemFetchResponse.WorkItems>();
         }
-
+                
         public static List<WorkItems> GetWorkItemsDetailInBatch(List<string> witIDsList, UrlParameters parameters)
         {
             List<WorkItemFetchResponse.WorkItems> viewModelList = new List<WorkItemFetchResponse.WorkItems>();
@@ -399,6 +403,7 @@ namespace unisys
             return workItemIteration;
         }
 
+        //Exporting the data from Datatable to Excel
         public static void ExportDataToExcel(DataTable dtWorklist)
         {
             Microsoft.Office.Interop.Excel.Application excel;
@@ -479,6 +484,7 @@ namespace unisys
 
         }
 
+        // Exporting data from Object to Datatable
         public static DataTable ExportToDataTable(List<WorkItemWithIteration> workItem)
         {
             DataTable dt = new DataTable();
@@ -532,6 +538,7 @@ namespace unisys
             return dt;
         }
 
+        //Compare data from Timesheet and VSTS data
         public static DataTable Comparetable(DataTable dtVsts, DataTable dtTimesheet)
         {
             DataTable dt = new DataTable();
@@ -567,7 +574,7 @@ namespace unisys
                             string Column = dtTimesheet.Columns[j].ColumnName;
                             var TimesheetVal = dtTimesheet.Rows[i][Column].ToString() == "" ? 0 : Convert.ToDouble(dtTimesheet.Rows[i][Column].ToString());
                             double vstsVal = 0;
-                            if (dtVsts.Columns.Contains(Column) && i < dtVsts.Rows.Count)
+                            if (dtVsts.Columns.Contains(Column.Replace(@"URBIS\", "")) && i < dtVsts.Rows.Count)
                             {
                                 int rowindex = 0;
                                 for (int k = 0; k < dtVsts.Rows.Count; k++)
@@ -582,7 +589,7 @@ namespace unisys
                                 }
                                 if (UserList[i].ToLower() == dtVsts.Rows[rowindex]["Row Labels"].ToString().ToLower())
                                 {
-                                    vstsVal = dtVsts.Rows[rowindex][Column].ToString() == "" ? 0 : Convert.ToDouble(dtVsts.Rows[rowindex][Column].ToString());
+                                    vstsVal = dtVsts.Rows[rowindex][Column.Replace(@"URBIS\", "")].ToString() == "" ? 0 : Convert.ToDouble(dtVsts.Rows[rowindex][Column.Replace(@"URBIS\", "")].ToString());
                                 }
                             }
 
@@ -602,6 +609,7 @@ namespace unisys
             return dt;
         }
 
+        //Read all users and iteration names from Time Sheet
         public static void readUserAndIterationFromTimeSheet(DataTable dt)
         {
             try
@@ -629,10 +637,39 @@ namespace unisys
             }
         }
 
+        //Log update
         private static void WriteFileToDisk(string label, string dataToWriteFile)
         {
             File.AppendAllText(logFile, DateTime.Now.ToString("yyyy:MM:dd:HH:MM:ss") + "\t" + label + "\t" + dataToWriteFile);
         }
+
+        //Read excel data to Datatable using EPPlus
+        public static DataTable ExcelToDataTable(string path, string sheetName)
+        {
+            var pck = new OfficeOpenXml.ExcelPackage();
+            pck.Load(File.OpenRead(path));
+            var ws = pck.Workbook.Worksheets[sheetName];
+            DataTable tbl = new DataTable();
+            bool hasHeader = true;
+            foreach (var firstRowCell in ws.Cells[1, 1, 1, ws.Dimension.End.Column])
+            {
+                tbl.Columns.Add(hasHeader ? firstRowCell.Text : string.Format("Column {0}", firstRowCell.Start.Column));
+            }
+            var startRow = hasHeader ? 2 : 1;
+            for (var rowNum = startRow; rowNum <= ws.Dimension.End.Row; rowNum++)
+            {
+                var wsRow = ws.Cells[rowNum, 1, rowNum, ws.Dimension.End.Column];
+                var row = tbl.NewRow();
+                foreach (var cell in wsRow)
+                {
+                    row[cell.Start.Column - 1] = cell.Text;
+                }
+                tbl.Rows.Add(row);
+            }
+            pck.Dispose();
+            return tbl;
+        }
+
     }
 }
 
