@@ -102,7 +102,8 @@ namespace unisys
                     {
                         foreach (var workItem in ItemList.value)
                         {
-                            var element = workItemIteration_cWork.Find(e => e.UserName == workItem.fields.SystemAssignedTo.uniqueName && e.IterationPath == workItem.fields.SystemIterationPath);
+                            string[] strIteration=workItem.fields.SystemIterationPath.Split('\\');
+                            var element = workItemIteration_cWork.Find(e => e.UserName == workItem.fields.SystemAssignedTo.uniqueName && e.IterationPath == strIteration[strIteration.Length-1]);
                             if (element != null)
                             {
                                 element.Value = element.Value + workItem.fields.MicrosoftVSTSSchedulingCompletedWork;
@@ -112,7 +113,7 @@ namespace unisys
                                 workItemIteration_cWork.Add(new WorkItemWithIteration
                                 {
                                     UserName = workItem.fields.SystemAssignedTo.uniqueName,
-                                    IterationPath = workItem.fields.SystemIterationPath,
+                                    IterationPath = strIteration[strIteration.Length - 1],
                                     Value = workItem.fields.MicrosoftVSTSSchedulingCompletedWork
                                 });
                             }
@@ -573,7 +574,7 @@ namespace unisys
                             string Column = dtTimesheet.Columns[j].ColumnName;
                             var TimesheetVal = dtTimesheet.Rows[i][Column].ToString() == "" ? 0 : Convert.ToDouble(dtTimesheet.Rows[i][Column].ToString());
                             double vstsVal = 0;
-                            if (dtVsts.Columns.Contains(Column) && i < dtVsts.Rows.Count)
+                            if (dtVsts.Columns.Contains(Column.Replace(@"URBIS\", "")) && i < dtVsts.Rows.Count)
                             {
                                 int rowindex = 0;
                                 for (int k = 0; k < dtVsts.Rows.Count; k++)
@@ -588,7 +589,7 @@ namespace unisys
                                 }
                                 if (UserList[i].ToLower() == dtVsts.Rows[rowindex]["Row Labels"].ToString().ToLower())
                                 {
-                                    vstsVal = dtVsts.Rows[rowindex][Column].ToString() == "" ? 0 : Convert.ToDouble(dtVsts.Rows[rowindex][Column].ToString());
+                                    vstsVal = dtVsts.Rows[rowindex][Column.Replace(@"URBIS\", "")].ToString() == "" ? 0 : Convert.ToDouble(dtVsts.Rows[rowindex][Column.Replace(@"URBIS\", "")].ToString());
                                 }
                             }
 
